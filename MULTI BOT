@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Chat Multi-IA Automático</title>
+  <script src="https://js.puter.com/v2/"></script>
+  <style>
+    body { font-family: Arial, sans-serif; background: #fef3c7; margin: 0; padding: 20px; display: flex; flex-direction: column; align-items: center; }
+    h1 { color: #b45309; }
+    .container { background: white; border-radius: 10px; box-shadow: 0 4px 12px rgb(0 0 0 / 0.1); max-width: 800px; width: 100%; padding: 20px; margin-bottom: 30px; }
+    label { font-weight: bold; display: block; margin-bottom: 6px; color: #92400e; }
+    textarea, input[type=text] { width: 100%; padding: 10px; margin-bottom: 12px; border: 1px solid #fbbf24; border-radius: 6px; font-size: 1rem; resize: vertical; }
+    button { background-color: #f59e0b; border: none; padding: 10px 20px; border-radius: 6px; color: white; font-weight: bold; cursor: pointer; transition: background-color 0.3s; }
+    button:hover { background-color: #d97706; }
+    #chatMessages { max-height: 350px; overflow-y: auto; border: 1px solid #fbbf24; border-radius: 6px; padding: 12px; background: #fffbeb; margin-bottom: 12px; white-space: pre-wrap; }
+    .message-user { color: #b45309; font-weight: bold; margin-top: 10px; }
+    .message-assistant { color: #15803d; font-weight: bold; margin-top: 10px; }
+    #imageOutput img { max-width: 100%; border-radius: 8px; margin-top: 12px; box-shadow: 0 4px 8px rgb(0 0 0 / 0.1); }
+  </style>
+</head>
+<body>
+
+  <h1>Chat Multi-IA Automático</h1>
+
+  <div class="container">
+    <label for="chatInput">Escribe tu mensaje (texto, código, imagen, historia, etc.):</label>
+    <textarea id="chatInput" rows="4" placeholder="Ejemplo: Escribe un poema sobre la programación o genera una imagen de un dragón futurista..."></textarea>
+    <button id="sendChatBtn">Enviar</button>
+    <div id="chatMessages"></div>
+  </div>
+
+  <div class="container" id="imageContainer" style="display:none;">
+    <label>Imagen generada:</label>
+    <div id="imageOutput"></div>
+  </div>
+
+  <script>
+    const chatMessages = document.getElementById('chatMessages');
+    const chatInput = document.getElementById('chatInput');
+    const sendChatBtn = document.getElementById('sendChatBtn');
+    const imageContainer = document.getElementById('imageContainer');
+    const imageOutput = document.getElementById('imageOutput');
+
+    // Lógica para seleccionar el modelo y herramienta más avanzada según el prompt
+    function seleccionarModelo(prompt) {
+      const p = prompt.toLowerCase();
+      if (p.includes("imagen") || p.includes("dibuja") || p.includes("genera una imagen") || p.includes("ilustración") || p.includes("foto")) {
+        return { modelo: "txt2img", herramienta: "DALL-E 3" };
+      }
+      if (p.includes("poema") || p.includes("historia") || p.includes("cuento") || p.includes("escribe una canción") || p.includes("creativo")) {
+        return { modelo: "claude-sonnet-4", herramienta: "redacción avanzada" };
+      }
+      if (p.includes("explica") || p.includes("teoría") || p.includes("código") || p.includes("programa") || p.includes("cómo funciona") || p.includes("analiza")) {
+        return { modelo: "gpt-4.1", herramienta: "análisis avanzado" };
+      }
+      if (p.includes("razona") || p.includes("filosofía") || p.includes("profundo") || p.includes("argumenta")) {
+        return { modelo: "deepseek-reasoner", herramienta: "razonamiento profundo" };
+      }
+      // Default: respuestas rápidas y contexto general
+      return { modelo: "x-ai/grok-3-beta", herramienta: "interacción rápida" };
+    }
+
+    function addMessage(text, sender) {
+      const div = document.createElement('div');
+      div.className = sender === 'user' ? 'message-user' : 'message-assistant';
+      div.textContent = (sender === 'user' ? 'Tú: ' : 'IA: ') + text;
+      chatMessages.appendChild(div);
+      chatMessages.scrollTop = chatMessages.scrollHeight;
+    }
+
+    async function sendChat() {
+      const prompt = chatInput.value.trim();
+      if (!prompt) return alert('Por favor, escribe tu mensaje.');
+      chatInput.value = '';
+      addMessage(prompt, 'user');
+
+      const { modelo } = seleccionarModelo(prompt);
+
+      // Imagen
+      if (modelo === "txt2img") {
+        addMessage("Generando imagen...", 'assistant');
+        imageContainer.style.display = "block";
+        imageOutput.innerHTML = "Generando imagen...";
+        try {
+          const imgElement = await puter.ai.txt2img(prompt);
+          imageOutput.innerHTML = '';
+          imageOutput.appendChild(imgElement);
+          chatMessages.lastChild.textContent = "IA: Imagen generada abajo 👇";
+        } catch (e) {
+          imageOutput.innerHTML = "Error al generar imagen.";
+          chatMessages.lastChild.textContent = "IA: Error al generar imagen.";
+        }
+        return;
+      }
+
+      // Chat con streaming
+      addMessage('Cargando respuesta...', 'assistant');
+      const lastMsg = chatMessages.lastChild;
+
+      try {
+        const response = await puter.ai.chat(prompt, { model: modelo, stream: true });
+        let fullText = '';
+        lastMsg.textContent = 'IA: ';
+        for await (const part of response) {
+          fullText += part.text;
+          lastMsg.textContent = 'IA: ' + fullText;
+          chatMessages.scrollTop = chatMessages.scrollHeight;
+        }
+      } catch (error) {
+        lastMsg.textContent = 'IA: Error al obtener respuesta.';
+      }
+    }
+
+    sendChatBtn.addEventListener('click', sendChat);
+
+    chatInput.addEventListener('keydown', e => {
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        sendChat();
+      }
+    });
+  </script>
+</body>
+</html>
